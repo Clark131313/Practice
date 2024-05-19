@@ -1,0 +1,692 @@
+ ***** main.cpp *****
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#include "document.h"
+#include "read_input_functions.h"
+#include "request_queue.h"
+#include "search_server.h"
+#include "string_processing.h"
+#include "paginator.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+using namespace std;
+
+
+
+
+int main() {
+    SearchServer search_server("and in at"s);
+    RequestQueue request_queue(search_server);
+    search_server.AddDocument(1, "curly cat curly tail"s, DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "curly dog and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, 3});
+    search_server.AddDocument(3, "big cat fancy collar "s, DocumentStatus::ACTUAL, {1, 2, 8});
+    search_server.AddDocument(4, "big dog sparrow Eugene"s, DocumentStatus::ACTUAL, {1, 3, 2});
+    search_server.AddDocument(5, "big dog sparrow Vasiliy"s, DocumentStatus::ACTUAL, {1, 1, 1});
+    // 1439 запросов с нулевым результатом
+    for (int i = 0; i < 1439; ++i) {
+        request_queue.AddFindRequest("empty request"s);
+    }
+    // все еще 1439 запросов с нулевым результатом
+    request_queue.AddFindRequest("curly dog"s);
+    // новые сутки, первый запрос удален, 1438 запросов с нулевым результатом
+    request_queue.AddFindRequest("big collar"s);
+    // первый запрос удален, 1437 запросов с нулевым результатом
+    request_queue.AddFindRequest("sparrow"s);
+    cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
+    return 0;
+}
+
+********document.cpp******
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+#include "document.h"
+
+Document::Document(int id, double relevance, int rating)
+        : id(id)
+        , relevance(relevance)
+        , rating(rating) {
+    }
+
+
+std::ostream& operator<< (std::ostream& out, const Document& doc){
+        out << "{ document_id = " << doc.id << ", relevance = " << doc.relevance << ", rating = " << doc.rating << " }";
+      return out;
+}
+
+
+*****document.h*********
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#pragma once
+
+#include <iostream>
+#include <string>
+
+
+struct Document {
+    Document() = default;
+    Document(int id, double relevance, int rating);
+    
+    int id = 0;
+    double relevance = 0.0;
+    int rating = 0;
+};
+
+enum class DocumentStatus {
+    ACTUAL,
+    IRRELEVANT,
+    BANNED,
+    REMOVED,
+};
+
+std::ostream& operator<< (std::ostream& out, const Document& doc);
+
+*******paginator.h*****
+
+//Вставьте сюда своё решение из урока «‎Очередь запросов».‎
+
+#pragma once
+
+#include <algorithm>
+#include <iterator>
+#include <ostream>
+#include <vector>
+
+
+
+template <typename Iterator>
+class IteratorRange {
+    
+ public:
+ 
+      IteratorRange(const Iterator& range_begin, const Iterator& range_end)
+    :begin_(range_begin),
+    end_(range_end){
+    
+    }
+ 
+auto begin()const{
+ return begin_;
+} 
+
+auto end()const{
+ return end_;
+}
+
+  
+
+ private:
+ Iterator begin_;
+ Iterator end_;
+
+
+};
+
+
+template <typename Iterator>
+class Paginator {
+public:
+
+
+Paginator( const Iterator& range_begin, const Iterator& range_end, size_t page_size)
+   :page_(page_size){
+        
+    auto it1= range_begin;
+    auto it2 = range_begin;
+    
+    while (it1 != range_end){
+        advance(it2, std::min(static_cast<int>(distance(it1, range_end)), page_));
+        docum_it.push_back({it1, it2});
+        it1 = it2;
+     
+        
+    }
+  
+ }
+
+auto begin()const{
+
+return docum_it.begin();
+}
+
+auto end()const{
+return docum_it.end();
+}
+
+
+private:
+
+int page_;
+std::vector<IteratorRange<Iterator>> docum_it;
+
+       
+};
+
+
+template <typename Iterator>
+std::ostream& operator<< (std::ostream& out, const IteratorRange<Iterator>& it){
+    
+    for (auto it_ = it.begin(); it_ != it.end(); ++it_){
+        out << *it_;
+    }
+    
+    
+    return out;
+}
+
+
+
+template <typename Container>
+auto Paginate(const Container& c, size_t page_size) {
+    return Paginator(begin(c), end(c), page_size);
+}
+
+*******  read_input_functions.cpp  ****
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+#include "read_input_functions.h"
+#include <iostream>
+
+
+std::string ReadLine() {
+    std::string s;
+    std::getline(std::cin, s);
+    return s;
+}
+
+int ReadLineWithNumber() {
+    int result;
+    std::cin >> result;
+    ReadLine();
+    return result;
+}
+
+
+
+*******  read_input_functions.h *****
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#pragma once
+
+#include <string>
+
+std::string ReadLine();
+int ReadLineWithNumber();
+
+
+******  request_queue.cpp ****
+
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#include "request_queue.h"
+//#include "search_server.h"
+
+
+RequestQueue::RequestQueue(const SearchServer& search_server) 
+    : search_server_(search_server){
+    
+    }
+
+std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentStatus status) {
+        
+        results = search_server_.FindTopDocuments(raw_query,status);
+        AddRequest(raw_query, results);
+        return results;
+    }
+
+std::vector<Document>  RequestQueue::AddFindRequest(const std::string& raw_query) {
+        
+        results = search_server_.FindTopDocuments(raw_query); 
+        AddRequest(raw_query, results);
+        return results;
+    }
+
+int RequestQueue::GetNoResultRequests() const {
+       int empty_requests = 0;
+        for (const auto& request : requests_) {
+            if (request.result.empty()) {
+                ++empty_requests;
+            }
+        }
+        return empty_requests;
+    }
+
+void RequestQueue::AddRequest(const std::string& raw_query, const std::vector<Document>& results) {
+        requests_.push_back({raw_query, results});
+        if (requests_.size() > min_in_day_) {
+            requests_.pop_front();
+        }
+    }
+
+
+********  request_queue.h  ********
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#pragma once
+#include "search_server.h"
+#include "document.h"
+
+#include <deque>
+#include <string>
+#include <vector>
+
+
+
+class RequestQueue {
+public:
+    explicit RequestQueue(const SearchServer& search_server);
+    
+   //шаблонная - не переносим
+    template <typename DocumentPredicate>
+    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
+        
+        results = search_server_.FindTopDocuments(raw_query,document_predicate); 
+        AddRequest(raw_query, results);
+        return results;
+      
+    }
+    
+    //переносим
+    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentStatus status);
+    
+    //переносим
+    std::vector<Document> AddFindRequest(const std::string& raw_query);
+    
+    //переносим
+    int GetNoResultRequests() const;
+    
+private:
+    const SearchServer& search_server_;
+    struct QueryResult {
+        std::string query;
+        std::vector <Document> result;
+        
+    };
+    
+    //переносим
+    void AddRequest(const std::string& raw_query, const std::vector<Document>& results);
+    
+    std::deque<QueryResult> requests_;
+    const static int min_in_day_ = 1440;
+    std::vector <Document> results; 
+    
+};
+
+
+
+******    search_server.cpp ********
+
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#include "search_server.h"
+
+
+using namespace std;
+
+SearchServer::SearchServer(const std::string& stop_words_text)
+        : SearchServer(
+            SplitIntoWords(stop_words_text))
+    {
+    }
+
+  void SearchServer::AddDocument(int document_id, const std::string& document, DocumentStatus status,
+                     const std::vector<int>& ratings) {
+        if ((document_id < 0) || (documents_.count(document_id) > 0)) {
+            throw invalid_argument("Invalid document_id"s);
+        }
+        const auto words = SplitIntoWordsNoStop(document);
+
+        const double inv_word_count = 1.0 / words.size();
+        for (const std::string& word : words) {
+            word_to_document_freqs_[word][document_id] += inv_word_count;
+        }
+        documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
+        document_ids_.push_back(document_id);
+    }
+
+std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentStatus status) const {
+        return FindTopDocuments(
+            raw_query, [status](int document_id, DocumentStatus document_status, int rating) {
+                return document_status == status;
+            });
+    }
+
+std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query) const {
+        return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
+    }
+
+int SearchServer::GetDocumentCount() const {
+        return documents_.size();
+    }
+
+int SearchServer::GetDocumentId(int index) const {
+        return document_ids_.at(index);
+    }
+
+std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query,
+                                                        int document_id) const {
+        const auto query = ParseQuery(raw_query);
+
+        std::vector<std::string> matched_words;
+        for (const std::string& word : query.plus_words) {
+            if (word_to_document_freqs_.count(word) == 0) {
+                continue;
+            }
+            if (word_to_document_freqs_.at(word).count(document_id)) {
+                matched_words.push_back(word);
+            }
+        }
+        for (const std::string& word : query.minus_words) {
+            if (word_to_document_freqs_.count(word) == 0) {
+                continue;
+            }
+            if (word_to_document_freqs_.at(word).count(document_id)) {
+                matched_words.clear();
+                break;
+            }
+        }
+        return {matched_words, documents_.at(document_id).status};
+    }
+
+
+bool SearchServer::IsStopWord(const std::string& word) const {
+        return stop_words_.count(word) > 0;
+    }
+
+bool SearchServer::IsValidWord(const std::string& word) {
+        // A valid word must not contain special characters
+        return none_of(word.begin(), word.end(), [](char c) {
+            return c >= '\0' && c < ' ';
+        });
+    }
+
+std::vector<std::string> SearchServer::SplitIntoWordsNoStop(const std::string& text) const {
+        std::vector<std::string> words;
+        for (const std::string& word : SplitIntoWords(text)) {
+            if (!IsValidWord(word)) {
+                throw invalid_argument("Word "s + word + " is invalid"s);
+            }
+            if (!IsStopWord(word)) {
+                words.push_back(word);
+            }
+        }
+        return words;
+    }
+
+ int SearchServer::ComputeAverageRating(const std::vector<int>& ratings) {
+        if (ratings.empty()) {
+            return 0;
+        }
+        int rating_sum = 0;
+        for (const int rating : ratings) {
+            rating_sum += rating;
+        }
+        return rating_sum / static_cast<int>(ratings.size());
+    }
+
+    
+
+ SearchServer::QueryWord SearchServer::ParseQueryWord(const std::string& text) const {
+        if (text.empty()) {
+            throw std::invalid_argument("Query word is empty"s);
+        }
+        std::string word = text;
+        bool is_minus = false;
+        if (word[0] == '-') {
+            is_minus = true;
+            word = word.substr(1);
+        }
+        if (word.empty() || word[0] == '-' || !IsValidWord(word)) {
+            throw std::invalid_argument("Query word "s + text + " is invalid");
+        }
+
+        return {word, is_minus, IsStopWord(word)};
+    }
+
+
+
+SearchServer::Query SearchServer::ParseQuery(const std::string& text) const {
+        Query result;
+        for (const std::string& word : SplitIntoWords(text)) {
+            const auto query_word = ParseQueryWord(word);
+            if (!query_word.is_stop) {
+                if (query_word.is_minus) {
+                    result.minus_words.insert(query_word.data);
+                } else {
+                    result.plus_words.insert(query_word.data);
+                }
+            }
+        }
+        return result;
+    }
+
+double SearchServer::ComputeWordInverseDocumentFreq(const std::string& word) const {
+        return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
+    }
+
+
+
+********  search_server.h ******
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#pragma once
+
+#include "document.h"
+#include "paginator.h"
+#include "read_input_functions.h"
+//#include "request_queue.h"
+#include "string_processing.h"
+
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <algorithm>
+#include <cmath>
+#include <tuple>
+
+const int MAX_RESULT_DOCUMENT_COUNT = 5;
+
+class SearchServer {
+public:
+    // шаблонная - не переносим
+    template <typename StringContainer>
+    explicit SearchServer(const StringContainer& stop_words)
+        : stop_words_(MakeUniqueNonEmptyStrings(stop_words))  // Extract non-empty stop words
+    {
+        if (!std::all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
+            throw std::invalid_argument("Some of stop words are invalid");
+        }
+    }
+    //переносим
+    explicit SearchServer(const std::string& stop_words_text);
+    
+     //переносим
+    void AddDocument(int document_id, const std::string& document, DocumentStatus status,
+        const std::vector<int>& ratings);
+    
+    
+    // шаблонная - не переносим
+    template <typename DocumentPredicate>
+    std::vector<Document> FindTopDocuments(const std::string& raw_query,
+                                      DocumentPredicate document_predicate) const {
+        const auto query = ParseQuery(raw_query);
+
+        auto matched_documents = FindAllDocuments(query, document_predicate);
+
+        std::sort(matched_documents.begin(), matched_documents.end(),
+             [](const Document& lhs, const Document& rhs) {
+                 if (std::abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                     return lhs.rating > rhs.rating;
+                 } else {
+                     return lhs.relevance > rhs.relevance;
+                 }
+             });
+        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+            matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+        }
+
+        return matched_documents;
+    }
+    
+    //переносим
+    std::vector<Document> FindTopDocuments(const std::string& raw_query, DocumentStatus status) const;
+
+    //переносим
+    std::vector<Document> FindTopDocuments(const std::string& raw_query) const;
+
+     //переносим
+    int GetDocumentCount() const;
+     //переносим
+    int GetDocumentId(int index) const;
+
+    //переносим
+    std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string& raw_query,
+    int document_id) const;
+
+private:
+    //переносим
+    struct DocumentData {
+        int rating;
+        DocumentStatus status;
+    };
+    struct QueryWord {
+        std::string data;
+        bool is_minus;
+        bool is_stop;
+    };
+    
+     struct Query {
+        std::set<std::string> plus_words;
+        std::set<std::string> minus_words;
+    };
+    
+    
+    
+    const std::set<std::string> stop_words_;
+    std::map<std::string, std::map<int, double>> word_to_document_freqs_;
+    std::map<int, DocumentData> documents_;
+    std::vector<int> document_ids_;
+
+    //переносим
+    bool IsStopWord(const std::string& word) const;
+
+    //переносим
+    static bool IsValidWord(const std::string& word);
+
+    //переносим
+    std::vector<std::string> SplitIntoWordsNoStop(const std::string& text) const;
+
+    //переносим
+    static int ComputeAverageRating(const std::vector<int>& ratings);
+
+    //переносим
+    QueryWord ParseQueryWord(const std::string& text) const;
+
+    //переносим
+    Query ParseQuery(const std::string& text) const;
+
+    //переносим
+    // Existence required
+    double ComputeWordInverseDocumentFreq(const std::string& word) const;
+
+     // шаблонная - не переносим
+    template <typename DocumentPredicate>
+    std::vector<Document> FindAllDocuments(const Query& query,
+                                      DocumentPredicate document_predicate) const {
+        std::map<int, double> document_to_relevance;
+        for (const std::string& word : query.plus_words) {
+            if (word_to_document_freqs_.count(word) == 0) {
+                continue;
+            }
+            const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
+            for (const auto &[document_id, term_freq] : word_to_document_freqs_.at(word)) {
+                const auto& document_data = documents_.at(document_id);
+                if (document_predicate(document_id, document_data.status, document_data.rating)) {
+                    document_to_relevance[document_id] += term_freq * inverse_document_freq;
+                }
+            }
+        }
+
+        for (const std::string& word : query.minus_words) {
+            if (word_to_document_freqs_.count(word) == 0) {
+                continue;
+            }
+            for (const auto &[document_id, _] : word_to_document_freqs_.at(word)) {
+                document_to_relevance.erase(document_id);
+            }
+        }
+
+        std::vector<Document> matched_documents;
+        for (const auto &[document_id, relevance] : document_to_relevance) {
+            matched_documents.push_back(
+                {document_id, relevance, documents_.at(document_id).rating});
+        }
+        return matched_documents;
+    }
+};
+
+
+
+**********  string_processing.cpp *********
+
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#include "string_processing.h"
+
+std::vector<std::string> SplitIntoWords(const std::string& text) {
+    std::vector<std::string> words;
+    std::string word;
+    for (const char c : text) {
+        if (c == ' ') {
+            if (!word.empty()) {
+                words.push_back(word);
+                word.clear();
+            }
+        } else {
+            word += c;
+        }
+    }
+    if (!word.empty()) {
+        words.push_back(word);
+    }
+
+    return words;
+}
+
+
+
+*********  string_processing.h  ********
+
+
+//Вставьте сюда своё решение из урока «Очередь запросов» темы «Стек, очередь, дек».‎
+
+#pragma once
+
+#include <set>
+#include <string>
+#include <vector>
+
+//шаблонная
+template <typename StringContainer>
+std::set<std::string> MakeUniqueNonEmptyStrings(const StringContainer& strings) {
+    std::set<std::string> non_empty_strings;
+    for (const std::string& str : strings) {
+        if (!str.empty()) {
+            non_empty_strings.insert(str);
+        }
+    }
+    return non_empty_strings;
+}
+
+std::vector<std::string> SplitIntoWords(const std::string& text);
