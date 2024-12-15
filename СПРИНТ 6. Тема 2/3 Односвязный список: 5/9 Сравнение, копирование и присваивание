@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <string>
+#include <vector>
 #include <utility>
 
 
@@ -226,6 +227,17 @@ public:
         ++size_;
         
     }
+    
+    /*
+    void PushBack(const Type& value) {
+        Node** last_ptr = &head_.next_node;
+        while (*last_ptr) {
+        last_ptr = &(*last_ptr)->next_node;
+        }
+        *last_ptr = new Node(value, nullptr);
+        ++size_;
+    }
+    */
 
     // Очищает список за время O(N)
     void Clear() noexcept {
@@ -238,6 +250,7 @@ public:
         }
         head_.next_node = nullptr;
         size_ = 0;
+        
         
     }
     
@@ -255,19 +268,38 @@ public:
         
     }
     ////////////////////////////////////////////////////
+    
      SingleLinkedList(std::initializer_list<Type> values) {
         // Реализуйте конструктор самостоятельно
-      
         
-        //for(auto it=values.rbegin(); it!=values.rend();++it){
-            //PushFront(*it);
-        //}
-        
-        std::vector<Type> temp(values);
-    for (auto it = temp.rbegin(); it != temp.rend(); ++it) {
+       assert(size_ == 0 && head_.next_node == nullptr);
+       
+      for (auto it = std::make_reverse_iterator(values.end());
+         it != std::make_reverse_iterator(values.begin()); ++it) {
         PushFront(*it);
-        }
+        }   
+   
     }
+    /*
+    SingleLinkedList(std::initializer_list<Type> values) {
+    assert(size_ == 0 && head_.next_node == nullptr);
+    auto it = values.end();
+    while (it != values.begin()) {
+        PushFront(*--it);
+    }
+    }
+    
+
+SingleLinkedList(std::initializer_list<Type> values) {
+        // Реализуйте конструктор самостоятельно
+        
+       assert(size_ == 0 && head_.next_node == nullptr);
+       
+      for (auto it = values.begin(); it != values.end(); ++it) {
+        PushBack(*it);
+        }   
+   
+   } */
 
     SingleLinkedList(const SingleLinkedList& other) {
         // Реализуйте конструктор самостоятельно
@@ -291,7 +323,7 @@ public:
     void swap(SingleLinkedList& other) noexcept {
         // Реализуйте обмен содержимого списков самостоятельно
        
-        std::swap(this->head_, other.head_);
+        std::swap(this->head_.next_node, other.head_.next_node);
         std::swap(this->size_, other.size_);
     }
     ///////////////////////////////////////////////////////
@@ -305,23 +337,16 @@ private:
 template <typename Type>
 void swap(SingleLinkedList<Type>& lhs, SingleLinkedList<Type>& rhs) noexcept {
     // Реализуйте обмен самостоятельно
-     ///using std::swap; // Для обеспечения ADL (argument-dependent lookup)
-        //swap(lhs.head_, rhs.head_);
-        //swap(lhs.size_, rhs.size_);
-        lhs.swap(rhs);
-       // lhs.SingleLinkedList::swap(rhs);
+     
+    lhs.swap(rhs);
 }
 
 template <typename Type>
 bool operator==(const SingleLinkedList<Type>& lhs, const SingleLinkedList<Type>& rhs) {
     // Заглушка. Реализуйте сравнение самостоятельно
    
-   if (lhs.GetSize() != rhs.GetSize()) {
-        return false;
-    }
-   
-   // Сравниваем элементы двух списков с помощью std::equal
-  return std::equal(lhs.begin(),lhs.end(), rhs.begin());
+    return lhs.GetSize() == rhs.GetSize() &&
+           std::equal(lhs.begin(), lhs.end(), rhs.begin());
  
 }
 
@@ -377,7 +402,7 @@ void Test3() {
         SingleLinkedList<int> another_empty_list;
 
         // Список равен самому себе
-        //assert(list_1 == list_1);
+        assert(list_1 == list_1);
         assert(empty_list == empty_list);
 
         // Списки с одинаковым содержимым равны, а с разным - не равны
@@ -484,7 +509,7 @@ void Test3() {
             : countdown_ptr(&copy_counter) {
         }
         ThrowOnCopy(const ThrowOnCopy& other)
-            : countdown_ptr(other.countdown_ptr)  //
+            : countdown_ptr(other.countdown_ptr)  
         {
             if (countdown_ptr) {
                 if (*countdown_ptr == 0) {
